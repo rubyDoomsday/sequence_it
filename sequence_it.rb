@@ -5,12 +5,17 @@ require 'open-uri'
 require 'pry'
 require 'json'
 
+# README
+# Add the following  to your .bashrc or .zshrc
+# "eq() { ruby ~/path/to/sequence_it.rb "$@" }"
+# command: seq path/to/file.sequence
+
 # creates sequence diagram
 class SequenceIt
   attr_accessor :sequence_file, :png_file, :destination_path
 
   def initialize(arg)
-    raise ArgumentError 'not a .sequence file' unless arg.ends_with?('.sequence')
+    raise ArgumentError 'not a .sequence file' unless arg.end_with?('.sequence')
     @sequence_file = "#{arg}"
     @png_file = "#{sequence_file.gsub('.sequence', '.png')}"
     @destination_path = "#{Dir.pwd}/"
