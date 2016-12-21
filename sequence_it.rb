@@ -5,11 +5,6 @@ require 'open-uri'
 require 'pry'
 require 'json'
 
-# README
-# Add the following  to your .bashrc or .zshrc
-# "eq() { ruby ~/path/to/sequence_it.rb "$@" }"
-# command: seq path/to/file.sequence
-
 # creates sequence diagram
 class SequenceIt
   attr_accessor :sequence_file, :png_file, :destination_path
