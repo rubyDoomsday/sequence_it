@@ -13,7 +13,7 @@ Uses the [websequencediagram](https://www.websequencediagrams.com/) API for conv
 ## Basic Installation
 
 After pulling the project, move the script to your desired location. `cd` into the path.
-run: `ruby sequence_it.rb path/to/file`
+run: `ruby sequence_it.rb path/to/file.seq`
 
 ## Advanced usage
 
