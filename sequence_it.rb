@@ -1,75 +1,103 @@
 #! /usr/bin/env ruby
+# frozen_string_literal: true
+
 require 'net/http'
 require 'uri'
 require 'open-uri'
 require 'pry'
 require 'json'
 
-# creates sequence diagram
+# SequenceIt: Creates sequence diagram by uploading a sequence file to the
+# websequencediagram.com API. The resulting PNG file is saved alongside the
+# originating markdown with the same name.
 class SequenceIt
-  attr_accessor :sequence_file, :png_file, :destination_path
-
-  def initialize(arg)
-    raise ArgumentError 'not a .sequence file' unless arg.end_with?('.sequence')
-    @sequence_file = "#{arg}"
-    @png_file = "#{sequence_file.gsub('.sequence', '.png')}"
-    @destination_path = "#{Dir.pwd}/"
+  class ConversionFailed < StandardError; end
+  class NotFound < StandardError # rubocop:disable Style/Documentation
+    def initialize(path)
+      super("file not found: #{path}")
+    end
+  end
+  class InvalidType < StandardError # rubocop:disable Style/Documentation
+    def initialize
+      super("accepted filetypes: #{EXTENSIONS}")
+    end
   end
 
-  def create_diagram
-    raise AgrmumentError unless File.exist?(sequence_file)
+  EXTENSIONS = [
+    SEQ      = '.seq',
+    SEQUENCE = '.sequence'
+  ].freeze
+  HOST       = 'https://www.websequencediagrams.com'
+  STYLE      = 'earth'
+  ROOT       = Pathname.new(Dir.pwd)
+  EXT_REGEX  = /^.*(#{EXTENSIONS.join('|')})\z/.freeze
 
-    $stderr.puts "Uploading: #{sequence_file}"
-    image_url = convert_via_api
+  def self.build(file_path)
+    new(file_path).build
+  rescue StandardError => e
+    warn e.message
+  end
 
-    $stderr.puts "Getting diagram from: #{image_url}"
-    retrieve_diagram(image_url)
+  def initialize(file_path)
+    raise InvalidType unless file_path.match(EXT_REGEX)
+    raise NotFound, file_path unless File.exist?(file_path)
 
-    $stderr.puts "Opening: #{png_file}"
-    open_image
+    @sequence_file = Pathname.new(ROOT + file_path)
+  end
+
+  def build
+    img = transform(sequence_file)
+
+    file = download(img)
+    open_image(file.path)
   end
 
   private
 
-  def convert_via_api
+  attr_reader :sequence_file
+
+  # @param file_path [String] The location of the sequence file
+  # @return [String] the image location query param (eg. ?img=msc051812355)
+  def transform(file_path)
+    warn "Uploading: #{file_path}"
+
+    params = { 'style' => STYLE, 'message' => File.read(file_path) }
+    uri    = URI.parse(HOST)
+
     response = Net::HTTP.post_form(uri, params)
-    return unless response.is_a?(Net::HTTPSuccess)
-    file_location = response.body.split('"')[1]
-    "http://www.websequencediagrams.com/#{file_location}"
+    raise ConversionFailed, response.body unless response.is_a?(Net::HTTPSuccess)
+
+    # NOTE: The response body is a ruby hash formated string not JSON :(
+    YAML.safe_load(response.body)['img']
   end
 
-  def retrieve_diagram(image_url)
-    File.open(destination_path + png_file, 'w+') do |f|
-      f << open(image_url).read
+  # @param url [String] The img query param
+  # @param png [String] The destinaion file path for the downloaded png image
+  def download(img)
+    uri = URI.parse(HOST + img)
+    warn "Downloading diagram from: #{uri}"
+
+    png = sequence_file.sub('.sequence', '.png')
+    File.open(png, 'w+') do |f|
+      # uses open-uri not the standard library so ignoring security warning
+      f << open(uri).read # rubocop:disable Security/Open
     end
   end
 
-  def open_image
+  # #param png_file [String] the png file path relative to current working dir
+  def open_image(png_file)
+    warn "Opening: #{png_file}"
     case RUBY_PLATFORM
-    when /linux/i
-      system("gnome-open file://#{destination_path + png_file}")
-    else
-      system("open #{destination_path + png_file}")
+    when /linux/i  then system("gnome-open file://#{png_file}")
+    when /darwin/i then system("open #{png_file}")
+    else raise StandardError "I don't know how to open the png on this OS"
     end
-  end
-
-  protected
-
-  def uri
-    URI.parse('http://www.websequencediagrams.com/index.php')
-  end
-
-  def params
-    text = File.read(sequence_file)
-    { 'style' => 'modern-blue', 'message' => text }
   end
 end
 
 # run
 if ARGV[0] && $stdout.tty?
-  diagram = SequenceIt.new(ARGV[0])
-  diagram.create_diagram
+  SequenceIt.build(ARGV[0])
 else
-  $stderr.puts('Missing argument')
+  warn('Missing argument')
 end
-
