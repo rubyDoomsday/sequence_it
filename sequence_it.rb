@@ -7,6 +7,7 @@ require 'open-uri'
 require 'pry'
 require 'json'
 require 'optparse'
+require 'yaml'
 
 class NotFound < StandardError # rubocop:disable Style/Documentation
   def initialize(path)
@@ -143,7 +144,7 @@ class SequenceIt
 
     File.open(filename, 'w+') do |f|
       # uses open-uri not the standard library so ignoring security warning
-      f << open(uri).read # rubocop:disable Security/Open
+      f << URI.open(uri.to_s).read # rubocop:disable Security/Open
     end
   end
 
@@ -167,10 +168,10 @@ end
 
 # run
 if $stdout.tty?
-  begin
+  #  begin
     SequenceIt.build(Arguments.parse(ARGV))
-  rescue StandardError => e
-    warn e.message
-    exit
-  end
+  # rescue StandardError => e
+  #   warn e.stacktrace
+  #   exit
+  # end
 end
